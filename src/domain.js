@@ -5,6 +5,7 @@ export function createEmptyMovie() {
     actors: [],
     tags: [],
     rating: 0,
+    playCount: 0,
     review: '',
     favorite: false,
   };
@@ -17,6 +18,7 @@ export function normalizeMovieInput(values) {
     actors: dedupeStrings(values.actors || []),
     tags: dedupeStrings(values.tags || []),
     rating: Number(values.rating) || 0,
+    playCount: Math.max(0, Number(values.playCount) || 0),
     review: values.review.trim(),
     favorite: Boolean(values.favorite),
   };
@@ -35,6 +37,14 @@ export function validateMovie(values) {
 
   if (Number(values.rating) < 0 || Number(values.rating) > 5) {
     errors.rating = '평점은 0점에서 5점 사이여야 합니다.';
+  }
+
+  if (values.playCount !== '' && Number.isNaN(Number(values.playCount))) {
+    errors.playCount = '재생횟수는 숫자여야 합니다.';
+  }
+
+  if (Number(values.playCount) < 0) {
+    errors.playCount = '재생횟수는 0 이상이어야 합니다.';
   }
 
   if (Number(values.rating) % 0.5 !== 0) {
@@ -76,6 +86,11 @@ export function getFilteredMovies(movies, filters) {
       );
     })
     .sort((a, b) => {
+      if (filters.sortBy === 'play-count-desc') {
+        return (b.playCount || 0) - (a.playCount || 0)
+          || new Date(b.updatedAt) - new Date(a.updatedAt);
+      }
+
       if (filters.sortBy === 'rating-desc') {
         return b.rating - a.rating || new Date(b.updatedAt) - new Date(a.updatedAt);
       }
@@ -128,7 +143,7 @@ export function getVisibleTags(tags, limit = 3) {
 }
 
 export function formatRating(rating) {
-  return `★${Number(rating).toFixed(1)}`;
+  return `${Number(rating).toFixed(1)}점`;
 }
 
 function dedupeStrings(items) {

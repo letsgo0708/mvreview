@@ -149,6 +149,7 @@ function FilterPanel({
           >
             <option value="updated-desc">최근 수정순</option>
             <option value="rating-desc">평점 높은순</option>
+            <option value="play-count-desc">재생횟수 높은순</option>
             <option value="title-asc">제목순</option>
           </select>
         </label>
@@ -209,7 +210,14 @@ function ActiveFilterChips({ filters, onRemoveActor, onRemoveTag, onResetRating,
   );
 }
 
-function MovieList({ movies, onSelectMovie, onEditMovie, onDeleteMovie, onToggleFavorite }) {
+function MovieList({
+  movies,
+  onSelectMovie,
+  onEditMovie,
+  onDeleteMovie,
+  onToggleFavorite,
+  onIncrementPlayCount,
+}) {
   if (movies.length === 0) {
     return <div style={styles.emptyState}>조건에 맞는 리뷰가 없습니다.</div>;
   }
@@ -224,13 +232,21 @@ function MovieList({ movies, onSelectMovie, onEditMovie, onDeleteMovie, onToggle
           onEdit={() => onEditMovie(movie)}
           onDelete={() => onDeleteMovie(movie.id)}
           onToggleFavorite={() => onToggleFavorite(movie.id)}
+          onIncrementPlayCount={() => onIncrementPlayCount(movie.id)}
         />
       ))}
     </div>
   );
 }
 
-function MovieListItem({ movie, onSelect, onEdit, onDelete, onToggleFavorite }) {
+function MovieListItem({
+  movie,
+  onSelect,
+  onEdit,
+  onDelete,
+  onToggleFavorite,
+  onIncrementPlayCount,
+}) {
   const visibleTags = getVisibleTags(movie.tags);
 
   return (
@@ -242,7 +258,6 @@ function MovieListItem({ movie, onSelect, onEdit, onDelete, onToggleFavorite }) 
             {movie.year ? <span style={styles.yearText}>({movie.year})</span> : null}
             <span style={styles.actorInlineText}>· &nbsp;{getSummaryActors(movie.actors)}</span>
           </div>
-          <div style={styles.ratingText}>{formatRating(movie.rating)}</div>
         </div>
 
         <div style={styles.tagRow}>
@@ -252,9 +267,23 @@ function MovieListItem({ movie, onSelect, onEdit, onDelete, onToggleFavorite }) 
             </span>
           ))}
         </div>
+
       </button>
 
       <div style={styles.itemActions}>
+        <div style={styles.ratingBlock}>
+            <span style={styles.ratingText}>{formatRating(movie.rating)}</span>
+            <span style={styles.playCountText}>· 재생 {movie.playCount || 0}회</span>
+            <span
+              onClick={onIncrementPlayCount}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#e0e7ff')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              style={styles.playCountButton}
+            >
+              +1
+            </span>
+          </div>
+        
         <button type="button" onClick={onToggleFavorite} style={styles.iconButton}>
           {movie.favorite ? '★' : '☆'}
         </button>
@@ -351,6 +380,18 @@ function MovieFormModal({
               ))}
             </select>
             {errors.rating ? <span style={styles.errorText}>{errors.rating}</span> : null}
+          </label>
+
+          <label style={styles.fieldLabel}>
+            재생횟수
+            <input
+              type="number"
+              min="0"
+              value={values.playCount}
+              onChange={(event) => onChange('playCount', event.target.value)}
+              style={styles.input}
+            />
+            {errors.playCount ? <span style={styles.errorText}>{errors.playCount}</span> : null}
           </label>
 
           <label style={styles.checkboxLabel}>
@@ -511,6 +552,7 @@ function MovieDetailModal({ movie, onClose, onEdit }) {
               {movie.title} {movie.year ? `(${movie.year})` : ''}
             </h2>
             <div style={styles.detailRating}>{formatRating(movie.rating)}</div>
+            <div style={styles.detailMeta}>재생 {movie.playCount || 0}회</div>
           </div>
           <button type="button" onClick={onClose} style={styles.closeButton}>
             닫기
@@ -551,7 +593,25 @@ function MovieDetailModal({ movie, onClose, onEdit }) {
 export default function App() {
   const [movies, setMovies] = useState(() => {
     const saved = localStorage.getItem('movies');
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+
+    try {
+      const parsed = JSON.parse(saved);
+      if (!Array.isArray(parsed)) return [];
+
+      return parsed.map((movie) => ({
+        ...movie,
+        actors: movie.actors || [],
+        tags: movie.tags || [],
+        rating: Number(movie.rating) || 0,
+        playCount: Math.max(0, Number(movie.playCount) || 0),
+        favorite: Boolean(movie.favorite),
+        createdAt: movie.createdAt || new Date().toISOString(),
+        updatedAt: movie.updatedAt || new Date().toISOString(),
+      }));
+    } catch {
+      return [];
+    }
   });
 
   useEffect(() => {
@@ -592,6 +652,7 @@ export default function App() {
       actors: movie.actors,
       tags: movie.tags,
       rating: movie.rating,
+      playCount: movie.playCount || 0,
       review: movie.review,
       favorite: movie.favorite,
     });
@@ -702,6 +763,32 @@ export default function App() {
     );
   };
 
+  const handleIncrementPlayCount = (id) => {
+    const timestamp = new Date().toISOString();
+
+    setMovies((prev) =>
+      prev.map((movie) =>
+        movie.id === id
+          ? {
+              ...movie,
+              playCount: (movie.playCount || 0) + 1,
+              updatedAt: timestamp,
+            }
+          : movie
+      )
+    );
+
+    setSelectedMovie((prev) =>
+      prev?.id === id
+        ? {
+            ...prev,
+            playCount: (prev.playCount || 0) + 1,
+            updatedAt: timestamp,
+          }
+        : prev
+    );
+  };
+
   const handleExportMovies = () => {
     const dataStr = JSON.stringify(movies, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
@@ -736,7 +823,19 @@ export default function App() {
         );
         if (!confirmed) return;
 
-        setMovies(parsed);
+        const normalizedMovies = parsed.map((movie) => ({
+          ...movie,
+          actors: movie.actors || [],
+          tags: movie.tags || [],
+          rating: Number(movie.rating) || 0,
+          playCount: Math.max(0, Number(movie.playCount) || 0),
+          favorite: Boolean(movie.favorite),
+          createdAt: movie.createdAt || new Date().toISOString(),
+          updatedAt: movie.updatedAt || new Date().toISOString(),
+        }));
+
+        setMovies(normalizedMovies);
+        
         window.alert('불러오기가 완료되었습니다.');
       } catch (error) {
         window.alert('JSON 파일을 읽는 중 오류가 발생했습니다.');
@@ -821,6 +920,7 @@ export default function App() {
           onEditMovie={openEditForm}
           onDeleteMovie={handleDeleteMovie}
           onToggleFavorite={handleToggleFavorite}
+          onIncrementPlayCount={handleIncrementPlayCount}
         />
       </div>
 
@@ -1053,6 +1153,7 @@ const styles = {
     border: '1px solid #e2e8f0',
     padding: 14,
     boxShadow: '0 8px 22px rgba(15, 23, 42, 0.04)',
+    alignItems: 'center',
   },
   listItemMain: {
     border: 'none',
@@ -1087,8 +1188,9 @@ const styles = {
     flexShrink: 0,
   },
   ratingText: {
+    fontSize: 16,
     fontWeight: 800,
-    color: '#b45309',
+    color: '#cc2432',
     flexShrink: 0,
   },
   tagRow: {
@@ -1109,8 +1211,7 @@ const styles = {
   itemActions: {
     display: 'flex',
     gap: 8,
-    alignItems: 'flex-start',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     justifyContent: 'flex-end',
   },
   iconButton: {
@@ -1212,7 +1313,7 @@ const styles = {
   },
   detailRating: {
     marginTop: 6,
-    color: '#b45309',
+    color: '#cc2432',
     fontWeight: 800,
   },
   reviewText: {
@@ -1242,5 +1343,39 @@ const styles = {
     color: '#64748b',
     marginBottom: 8,
   },
+  metaRow: {
+    marginTop: 8,
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: 600,
+  },
 
+  detailMeta: {
+    marginTop: 4,
+    color: '#64748b',
+    fontSize: 14,
+    fontWeight: 600,
+  },
+
+  ratingBlock: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+  },
+
+  playCountText: {
+    fontSize: 13,
+    color: '#64748b',
+    fontWeight: 600,
+  },
+  playCountButton: {
+    fontSize: 13,
+    fontWeight: 700,
+    color: '#2563eb',
+    cursor: 'pointer',
+    padding: '1px 4px',
+    borderRadius: 6,
+    lineHeight: 1.2,
+  },
 };
