@@ -248,6 +248,7 @@ function MovieListItem({
   onIncrementPlayCount,
 }) {
   const visibleTags = getVisibleTags(movie.tags);
+  const hiddenCount = movie.tags.length - visibleTags.length;
 
   return (
     <article style={styles.listItem}>
@@ -266,6 +267,12 @@ function MovieListItem({
               {tag}
             </span>
           ))}
+
+          {hiddenCount > 0 && (
+            <span title={movie.tags.join(', ')} style={styles.moreTag}>
+              +{hiddenCount}
+            </span>
+          )}
         </div>
 
       </button>
@@ -1377,5 +1384,11 @@ const styles = {
     padding: '1px 4px',
     borderRadius: 6,
     lineHeight: 1.2,
+  },
+  moreTag: {
+    fontSize: 12,
+    color: '#64748b',
+    fontWeight: 600,
+    padding: '2px 8px',
   },
 };

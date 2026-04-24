@@ -138,7 +138,7 @@ export function getSummaryActors(actors) {
   return `${actors[0]} 외 ${actors.length - 1}`;
 }
 
-export function getVisibleTags(tags, limit = 6) {
+export function getVisibleTags(tags, limit = 10) {
   return tags.slice(0, limit);
 }
 
