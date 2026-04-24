@@ -467,7 +467,6 @@ function PresetSelector({
 
       {recentItems.length > 0 ? (
         <>
-          <div style={styles.subtleLabel}>{label}</div>
           <div style={styles.chipWrap}>
             {recentItems.map((item) => {
               const isSelected = selectedItems.some(
