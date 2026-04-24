@@ -103,7 +103,7 @@ export function getFilteredMovies(movies, filters) {
     });
 }
 
-export function getRecentOptions(movies, field, limit = 8) {
+export function getRecentOptions(movies, field, limit = 12) {
   const seen = new Set();
   const ordered = [...movies].sort(
     (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)
